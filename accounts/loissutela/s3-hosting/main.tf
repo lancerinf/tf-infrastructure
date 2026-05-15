@@ -51,6 +51,7 @@ resource "aws_cloudfront_distribution" "loissutela_art_site" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
+  aliases             = ["loissutela.art", "www.loissutela.art"]
 
   origin {
     origin_id                = "s3-loissutela-art-site"
@@ -65,6 +66,11 @@ resource "aws_cloudfront_distribution" "loissutela_art_site" {
     cached_methods         = ["GET", "HEAD"]
     compress               = true
     cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.redirect_www_to_apex.arn
+    }
   }
 
   custom_error_response {
@@ -82,7 +88,9 @@ resource "aws_cloudfront_distribution" "loissutela_art_site" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = aws_acm_certificate_validation.loissutela_art.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 
   restrictions {
@@ -114,4 +122,125 @@ data "aws_iam_policy_document" "loissutela_art_site_bucket" {
 resource "aws_s3_bucket_policy" "loissutela_art_site" {
   bucket = aws_s3_bucket.loissutela_art_site.id
   policy = data.aws_iam_policy_document.loissutela_art_site_bucket.json
+}
+
+resource "aws_acm_certificate" "loissutela_art" {
+  provider                  = aws.us_east_1
+  domain_name               = "loissutela.art"
+  subject_alternative_names = ["www.loissutela.art"]
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "loissutela_art_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.loissutela_art.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  zone_id         = aws_route53_zone.loissutela_art.zone_id
+  name            = each.value.name
+  type            = each.value.type
+  ttl             = 60
+  records         = [each.value.record]
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "loissutela_art" {
+  provider                = aws.us_east_1
+  certificate_arn         = aws_acm_certificate.loissutela_art.arn
+  validation_record_fqdns = [for r in aws_route53_record.loissutela_art_cert_validation : r.fqdn]
+}
+
+resource "aws_cloudfront_function" "redirect_www_to_apex" {
+  name    = "loissutela-art-redirect-www-to-apex"
+  runtime = "cloudfront-js-2.0"
+  comment = "301 redirect www.loissutela.art to loissutela.art"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var host = request.headers.host && request.headers.host.value;
+      if (host === 'www.loissutela.art') {
+        var qs = '';
+        if (request.querystring) {
+          var parts = [];
+          for (var k in request.querystring) {
+            var v = request.querystring[k];
+            if (v.multiValue) {
+              for (var i = 0; i < v.multiValue.length; i++) {
+                parts.push(k + '=' + v.multiValue[i].value);
+              }
+            } else {
+              parts.push(k + '=' + v.value);
+            }
+          }
+          if (parts.length > 0) { qs = '?' + parts.join('&'); }
+        }
+        return {
+          statusCode: 301,
+          statusDescription: 'Moved Permanently',
+          headers: {
+            location: { value: 'https://loissutela.art' + request.uri + qs },
+            'cache-control': { value: 'max-age=3600' }
+          }
+        };
+      }
+      return request;
+    }
+  EOT
+}
+
+resource "aws_route53_record" "loissutela_art_apex_a" {
+  zone_id = aws_route53_zone.loissutela_art.zone_id
+  name    = "loissutela.art"
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.loissutela_art_site.domain_name
+    zone_id                = aws_cloudfront_distribution.loissutela_art_site.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "loissutela_art_apex_aaaa" {
+  zone_id = aws_route53_zone.loissutela_art.zone_id
+  name    = "loissutela.art"
+  type    = "AAAA"
+
+  alias {
+    name                   = aws_cloudfront_distribution.loissutela_art_site.domain_name
+    zone_id                = aws_cloudfront_distribution.loissutela_art_site.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "loissutela_art_www_a" {
+  zone_id = aws_route53_zone.loissutela_art.zone_id
+  name    = "www.loissutela.art"
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.loissutela_art_site.domain_name
+    zone_id                = aws_cloudfront_distribution.loissutela_art_site.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "loissutela_art_www_aaaa" {
+  zone_id = aws_route53_zone.loissutela_art.zone_id
+  name    = "www.loissutela.art"
+  type    = "AAAA"
+
+  alias {
+    name                   = aws_cloudfront_distribution.loissutela_art_site.domain_name
+    zone_id                = aws_cloudfront_distribution.loissutela_art_site.hosted_zone_id
+    evaluate_target_health = false
+  }
 }
