@@ -1,10 +1,26 @@
 resource "aws_ssm_parameter" "belle_arti_paintings_s3_uri" {
   name  = "/belle-arti/paintings-s3-uri"
   type  = "String"
-  value = "placeholder"
+  value = "s3://${aws_s3_bucket.loissutela_art_paintings.bucket}"
+}
 
-  lifecycle {
-    ignore_changes = [value]
+resource "aws_s3_bucket" "loissutela_art_paintings" {
+  bucket = "loissutela-art-paintings-389210"
+}
+
+resource "aws_s3_bucket_public_access_block" "loissutela_art_paintings" {
+  bucket                  = aws_s3_bucket.loissutela_art_paintings.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "loissutela_art_paintings" {
+  bucket = aws_s3_bucket.loissutela_art_paintings.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
   }
 }
 
