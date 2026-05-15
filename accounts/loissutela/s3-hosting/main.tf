@@ -24,6 +24,14 @@ resource "aws_s3_bucket_ownership_controls" "loissutela_art_paintings" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "loissutela_art_paintings" {
+  bucket = aws_s3_bucket.loissutela_art_paintings.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_ssm_parameter" "belle_arti_site_s3_uri" {
   name  = "/belle-arti/site-s3-uri"
   type  = "String"
