@@ -182,46 +182,6 @@ resource "aws_acm_certificate_validation" "loissutela_art" {
   validation_record_fqdns = [for r in aws_route53_record.loissutela_art_cert_validation : r.fqdn]
 }
 
-# TODO: remove after first apply (was redirect_www_to_apex, kept to avoid in-use delete race)
-resource "aws_cloudfront_function" "redirect_www_to_apex" {
-  name    = "loissutela-art-redirect-www-to-apex"
-  runtime = "cloudfront-js-2.0"
-  comment = "301 redirect www.loissutela.art to loissutela.art"
-  publish = true
-  code    = <<-EOT
-    function handler(event) {
-      var request = event.request;
-      var host = request.headers.host && request.headers.host.value;
-      if (host === 'www.loissutela.art') {
-        var qs = '';
-        if (request.querystring) {
-          var parts = [];
-          for (var k in request.querystring) {
-            var v = request.querystring[k];
-            if (v.multiValue) {
-              for (var i = 0; i < v.multiValue.length; i++) {
-                parts.push(k + '=' + v.multiValue[i].value);
-              }
-            } else {
-              parts.push(k + '=' + v.value);
-            }
-          }
-          if (parts.length > 0) { qs = '?' + parts.join('&'); }
-        }
-        return {
-          statusCode: 301,
-          statusDescription: 'Moved Permanently',
-          headers: {
-            location: { value: 'https://loissutela.art' + request.uri + qs },
-            'cache-control': { value: 'max-age=3600' }
-          }
-        };
-      }
-      return request;
-    }
-  EOT
-}
-
 resource "aws_cloudfront_function" "viewer_request_router" {
   name    = "loissutela-art-viewer-request-router"
   runtime = "cloudfront-js-2.0"
