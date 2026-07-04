@@ -50,6 +50,7 @@ Profile usage per account:
 | Account directory          | AWS profile used (provider) | AWS profile used (backend) |
 |----------------------------|-----------------------------|----------------------------|
 | `accounts/fede-dev/`       | `fede-dev`                  | `fede-dev`                 |
+| `accounts/infrastructure/` | `infrastructure`            | `fede-dev`                 |
 | `accounts/loissutela/`     | `loissutela`                | `fede-dev`                 |
 
 
